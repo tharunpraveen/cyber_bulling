@@ -12,7 +12,7 @@ from tensorflow.keras.applications.resnet50 import preprocess_input as resnet_pr
 # -----------------------
 @st.cache_resource
 def load_ml_model(model_name):
-    model_path = hf_hub_download(repo_id="https://huggingface.co/Pandu1729/models", filename=model_name)
+    model_path = hf_hub_download(repo_id="Pandu1729/models", filename=model_name)
     return joblib.load(model_path)
 
 ml_models = {
