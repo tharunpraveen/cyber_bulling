@@ -1,7 +1,6 @@
 streamlit
 tensorflow
+opencv-python-headless
+scikit-learn
+requests
 numpy
-joblib
-huggingface_hub
-pillow
-scikit-learn==1.2.2
