@@ -29,10 +29,10 @@ def load_models():
         'resnet50': create_feature_extractor(ResNet50, resnet50_preprocess),
         'inceptionv3': create_feature_extractor(InceptionV3, inceptionv3_preprocess),
         'inceptionresnetv2': create_feature_extractor(InceptionResNetV2, inceptionresnetv2_preprocess),
-        'scaler': pickle.load(open("/kaggle/input/scaler/other/default/1/scaler.pkl", "rb")),
-        'logreg': pickle.load(open("/kaggle/input/logistic_regression/other/default/1/logistic_regression.pkl", "rb")),
-        'rf': pickle.load(open("/kaggle/input/random_forest/other/default/1/random_forest.pkl", "rb")),
-        'sgd': pickle.load(open("/kaggle/input/sgdclassifier/other/default/1/sgd_classifier.pkl", "rb"))
+        'scaler': pickle.load(open("https://huggingface.co/Pandu1729/scaler/resolve/main/scaler.pkl", "rb")),
+        'logreg': pickle.load(open("https://huggingface.co/Pandu1729/logistic_regression/resolve/main/logistic_regression.pkl", "rb")),
+        'rf': pickle.load(open("https://huggingface.co/Pandu1729/random_forest/resolve/main/random_forest.pkl", "rb")),
+        'sgd': pickle.load(open("https://huggingface.co/Pandu1729/sgd_classifier/resolve/main/sgd_classifier.pkl", "rb"))
     }
 
 def load_image_from_upload(uploaded_file):
