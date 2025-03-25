@@ -13,9 +13,28 @@ from tensorflow.keras.applications.inception_v3 import preprocess_input as incep
 from tensorflow.keras.applications.inception_resnet_v2 import preprocess_input as inceptionresnetv2_preprocess
 import pickle
 
-# Cache resource-intensive components
+# Hugging Face model URLs
+MODEL_URLS = {
+    "scaler": "https://huggingface.co/Pandu1729/scaler/resolve/main/scaler.pkl",
+    "logreg": "https://huggingface.co/Pandu1729/logistic_regression/resolve/main/logistic_regression.pkl",
+    "rf": "https://huggingface.co/Pandu1729/random_forest/resolve/main/random_forest.pkl",
+    "sgd": "https://huggingface.co/Pandu1729/sgdclassifier/resolve/main/sgd_classifier.pkl"
+}
+
+@st.cache_resource
+def load_model_from_url(url):
+    """Download and load a pickle file from a URL"""
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        return pickle.load(BytesIO(response.content))
+    except Exception as e:
+        st.error(f"Error loading model from {url}: {str(e)}")
+        raise
+
 @st.cache_resource
 def load_models():
+    """Load all required models and feature extractors"""
     # Create feature extractors
     def create_feature_extractor(model_class, preprocess_fn):
         base_model = model_class(weights='imagenet', include_top=False, input_shape=(224, 224, 3))
@@ -29,11 +48,12 @@ def load_models():
         'resnet50': create_feature_extractor(ResNet50, resnet50_preprocess),
         'inceptionv3': create_feature_extractor(InceptionV3, inceptionv3_preprocess),
         'inceptionresnetv2': create_feature_extractor(InceptionResNetV2, inceptionresnetv2_preprocess),
-        'scaler': pickle.load(open("https://huggingface.co/Pandu1729/scaler/resolve/main/scaler.pkl", "rb")),
-        'logreg': pickle.load(open("https://huggingface.co/Pandu1729/logistic_regression/resolve/main/logistic_regression.pkl", "rb")),
-        'rf': pickle.load(open("https://huggingface.co/Pandu1729/random_forest/resolve/main/random_forest.pkl", "rb")),
-        'sgd': pickle.load(open("https://huggingface.co/Pandu1729/sgd_classifier/resolve/main/sgd_classifier.pkl", "rb"))
+        'scaler': load_model_from_url(MODEL_URLS["scaler"]),
+        'logreg': load_model_from_url(MODEL_URLS["logreg"]),
+        'rf': load_model_from_url(MODEL_URLS["rf"]),
+        'sgd': load_model_from_url(MODEL_URLS["sgd"])
     }
+
 
 def load_image_from_upload(uploaded_file):
     file_bytes = np.asarray(bytearray(uploaded_file.read()), dtype=np.uint8)
