@@ -35,6 +35,9 @@ def load_model_from_url(url):
 @st.cache_resource
 def load_models():
     """Load all required models and feature extractors"""
+    # Initialize TensorFlow first to avoid thread conflicts
+    tf.keras.backend.clear_session()
+    
     # Create feature extractors
     def create_feature_extractor(model_class, preprocess_fn):
         base_model = model_class(weights='imagenet', include_top=False, input_shape=(224, 224, 3))
@@ -53,7 +56,6 @@ def load_models():
         'rf': load_model_from_url(MODEL_URLS["rf"]),
         'sgd': load_model_from_url(MODEL_URLS["sgd"])
     }
-
 
 def load_image_from_upload(uploaded_file):
     file_bytes = np.asarray(bytearray(uploaded_file.read()), dtype=np.uint8)
