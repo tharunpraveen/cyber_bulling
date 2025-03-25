@@ -1,6 +1,7 @@
-streamlit
-tensorflow
-opencv-python-headless
-scikit-learn
-requests
-numpy
+streamlit==1.36.0
+tensorflow==2.15.0
+opencv-python-headless==4.9.0.80
+scikit-learn==1.2.2  # Match your pickle version
+requests==2.31.0
+numpy==1.26.4
+h5py==3.10.0
