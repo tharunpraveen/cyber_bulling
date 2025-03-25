@@ -1,95 +1,133 @@
 import streamlit as st
+import cv2
 import numpy as np
-import joblib
-from huggingface_hub import hf_hub_download
-from tensorflow.keras.applications import VGG16, ResNet50
-from tensorflow.keras.preprocessing import image
-from tensorflow.keras.applications.vgg16 import preprocess_input as vgg_preprocess
-from tensorflow.keras.applications.resnet50 import preprocess_input as resnet_preprocess
+import requests
+from io import BytesIO
+import tensorflow as tf
+from tensorflow.keras.layers import GlobalAveragePooling2D
+from tensorflow.keras.applications import VGG16, VGG19, ResNet50, InceptionV3, InceptionResNetV2
+from tensorflow.keras.applications.vgg16 import preprocess_input as vgg16_preprocess
+from tensorflow.keras.applications.vgg19 import preprocess_input as vgg19_preprocess
+from tensorflow.keras.applications.resnet50 import preprocess_input as resnet50_preprocess
+from tensorflow.keras.applications.inception_v3 import preprocess_input as inceptionv3_preprocess
+from tensorflow.keras.applications.inception_resnet_v2 import preprocess_input as inceptionresnetv2_preprocess
+import pickle
 
-# -----------------------
-# 🎯 Load ML Models from Hugging Face
-# -----------------------
+# Cache resource-intensive components
 @st.cache_resource
-def load_ml_model(model_name):
-    model_path = hf_hub_download(repo_id="Pandu1729/models", filename=model_name)
-    return joblib.load(model_path)
+def load_models():
+    # Create feature extractors
+    def create_feature_extractor(model_class, preprocess_fn):
+        base_model = model_class(weights='imagenet', include_top=False, input_shape=(224, 224, 3))
+        x = GlobalAveragePooling2D()(base_model.output)
+        extractor = tf.keras.Model(inputs=base_model.input, outputs=x)
+        return extractor, preprocess_fn
 
-ml_models = {
-    "Logistic Regression": load_ml_model("logistic_regression.pkl"),
-    "Random Forest": load_ml_model("random_forest.pkl"),
-    "SGD Classifier": load_ml_model("sgd_classifier.pkl")
-}
+    return {
+        'vgg16': create_feature_extractor(VGG16, vgg16_preprocess),
+        'vgg19': create_feature_extractor(VGG19, vgg19_preprocess),
+        'resnet50': create_feature_extractor(ResNet50, resnet50_preprocess),
+        'inceptionv3': create_feature_extractor(InceptionV3, inceptionv3_preprocess),
+        'inceptionresnetv2': create_feature_extractor(InceptionResNetV2, inceptionresnetv2_preprocess),
+        'scaler': pickle.load(open("/kaggle/input/scaler/other/default/1/scaler.pkl", "rb")),
+        'logreg': pickle.load(open("/kaggle/input/logistic_regression/other/default/1/logistic_regression.pkl", "rb")),
+        'rf': pickle.load(open("/kaggle/input/random_forest/other/default/1/random_forest.pkl", "rb")),
+        'sgd': pickle.load(open("/kaggle/input/sgdclassifier/other/default/1/sgd_classifier.pkl", "rb"))
+    }
 
-# -----------------------
-# 🎯 Load Pre-trained CNN Models for Feature Extraction
-# -----------------------
-@st.cache_resource
-def load_cnn_models():
-    vgg_model = VGG16(weights="imagenet", include_top=False)
-    resnet_model = ResNet50(weights="imagenet", include_top=False)
-    return vgg_model, resnet_model
+def load_image_from_upload(uploaded_file):
+    file_bytes = np.asarray(bytearray(uploaded_file.read()), dtype=np.uint8)
+    img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+    return img
 
-vgg_model, resnet_model = load_cnn_models()
+def load_image_from_url(url):
+    response = requests.get(url)
+    img = cv2.imdecode(np.frombuffer(response.content, np.uint8), cv2.IMREAD_COLOR)
+    return img
 
-# -----------------------
-# 🎯 Feature Extraction Function
-# -----------------------
-def extract_features(img_path, model, preprocess_func):
-    img = image.load_img(img_path, target_size=(224, 224))
-    img_array = image.img_to_array(img)
-    img_array = np.expand_dims(img_array, axis=0)
-    img_array = preprocess_func(img_array)  # Apply preprocessing
+def extract_features_all_models(img, models):
+    img = cv2.resize(img, (224, 224))
+    features_list = []
+    
+    # VGG16
+    img_vgg16 = np.expand_dims(img.copy(), axis=0)
+    img_vgg16 = models['vgg16'][1](img_vgg16)
+    features_list.append(models['vgg16'][0].predict(img_vgg16, verbose=0))
+    
+    # VGG19
+    img_vgg19 = np.expand_dims(img.copy(), axis=0)
+    img_vgg19 = models['vgg19'][1](img_vgg19)
+    features_list.append(models['vgg19'][0].predict(img_vgg19, verbose=0))
+    
+    # ResNet50
+    img_resnet50 = np.expand_dims(img.copy(), axis=0)
+    img_resnet50 = models['resnet50'][1](img_resnet50)
+    features_list.append(models['resnet50'][0].predict(img_resnet50, verbose=0))
+    
+    # InceptionV3
+    img_inceptionv3 = np.expand_dims(img.copy(), axis=0)
+    img_inceptionv3 = models['inceptionv3'][1](img_inceptionv3)
+    features_list.append(models['inceptionv3'][0].predict(img_inceptionv3, verbose=0))
+    
+    # InceptionResNetV2
+    img_inceptionresnetv2 = np.expand_dims(img.copy(), axis=0)
+    img_inceptionresnetv2 = models['inceptionresnetv2'][1](img_inceptionresnetv2)
+    features_list.append(models['inceptionresnetv2'][0].predict(img_inceptionresnetv2, verbose=0))
+    
+    return np.concatenate(features_list, axis=1)
 
-    features = model.predict(img_array)
-    return features.flatten()  # Convert to 1D vector
+def main():
+    st.set_page_config(page_title="Cyberbullying Detection", layout="wide")
+    st.title("Cyberbullying Image Detection")
+    st.write("Upload an image or provide a URL to check for potential cyberbullying content")
 
-# -----------------------
-# 🎯 Streamlit UI
-# -----------------------
+    # Load models once
+    models = load_models()
 
-st.set_page_config(page_title="Cyberbullying Detection", layout="wide")
+    # Input selection
+    input_method = st.radio("Select input method:", ("Upload Image", "Image URL"))
 
-# Sidebar
-st.sidebar.image("https://upload.wikimedia.org/wikipedia/commons/thumb/3/3c/Cyberbullying_Awareness.svg/256px-Cyberbullying_Awareness.svg.png", width=200)
-st.sidebar.title("🔍 Cyberbullying Image Classifier")
-st.sidebar.write("Upload an image to analyze whether it contains cyberbullying elements.")
+    img = None
+    if input_method == "Upload Image":
+        uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png"])
+        if uploaded_file:
+            img = load_image_from_upload(uploaded_file)
+    else:
+        url = st.text_input("Enter Image URL:")
+        if url:
+            try:
+                img = load_image_from_url(url)
+            except:
+                st.error("Error loading image from URL")
 
-st.sidebar.markdown("---")
-
-# Main App
-st.title("🚀 Cyberbullying Image Classification")
-
-uploaded_file = st.file_uploader("📤 Upload an image (JPG/PNG)", type=["jpg", "png"])
-
-if uploaded_file:
-    col1, col2 = st.columns(2)
-
-    with col1:
-        st.image(uploaded_file, caption="📷 Uploaded Image", use_column_width=True)
-
-    with col2:
-        st.info("✅ **Extracting Features...**")
-        vgg_features = extract_features(uploaded_file, vgg_model, vgg_preprocess)
-        resnet_features = extract_features(uploaded_file, resnet_model, resnet_preprocess)
+    if img is not None:
+        st.image(img, channels="BGR", width=300)
         
-        # Combine VGG16 and ResNet50 Features
-        combined_features = np.concatenate((vgg_features, resnet_features))
+        with st.spinner("Analyzing image..."):
+            try:
+                features = extract_features_all_models(img, models)
+                features_scaled = models['scaler'].transform(features)
+                
+                # Get predictions
+                pred_lr = models['logreg'].predict(features_scaled)[0]
+                pred_rf = models['rf'].predict(features_scaled)[0]
+                pred_sgd = models['sgd'].predict(features_scaled)[0]
 
-        st.success("✨ Features extracted successfully!")
+                # Display results
+                st.subheader("Detection Results:")
+                cols = st.columns(3)
+                with cols[0]:
+                    st.write("**Logistic Regression:**")
+                    st.success("Non-Bullying") if pred_lr == 0 else st.error("Bullying")
+                with cols[1]:
+                    st.write("**Random Forest:**")
+                    st.success("Non-Bullying") if pred_rf == 0 else st.error("Bullying")
+                with cols[2]:
+                    st.write("**SGD Classifier:**")
+                    st.success("Non-Bullying") if pred_sgd == 0 else st.error("Bullying")
 
-        # -----------------------
-        # 🎯 Make Predictions Using All Models
-        # -----------------------
+            except Exception as e:
+                st.error(f"Error processing image: {str(e)}")
 
-        st.subheader("📊 Model Predictions")
-
-        results = []
-        for model_name, model in ml_models.items():
-            pred_prob = model.predict_proba([combined_features])[0]  # Get probability scores
-            pred_class = model.predict([combined_features])[0]  # Get predicted class
-            
-            results.append({"Model": model_name, "Prediction": pred_class, "Confidence": f"{max(pred_prob) * 100:.2f}%"})
-
-        # Display results in a table
-        st.table(results)
+if __name__ == "__main__":
+    main()
