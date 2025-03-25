@@ -1,7 +1,6 @@
 streamlit==1.36.0
-h5py==3.10.0
-TensorFlow: 2.17.1
-OpenCV: 4.10.0
-scikit-learn: 1.2.2
-Requests: 2.32.3
-NumPy: 1.26.4
+tensorflow==2.17.1
+opencv-python-headless==4.10.0.66
+scikit-learn==1.2.2
+requests==2.32.3
+numpy==1.26.4
